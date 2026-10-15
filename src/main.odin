@@ -38,6 +38,25 @@ minmax :: proc(s: ^Solver, candidates: []Word) -> Word {
 	return best
 }
 
+feedback_from_string :: proc(s: string) -> (res: Feedback, ok: bool) {
+	if len(s) != WORD_LEN do return 0, false
+	r: Feedback = 0
+	p: Feedback = 1
+	for b in s {
+		switch b {
+		case 'w':
+		case 'e':
+			r += p
+		case 'c':
+			r += p + p
+		case:
+			return 0, false
+		}
+		p *= 3
+	}
+	return r, true
+}
+
 fill_feedback_table :: proc(s: ^Solver) {
 	for guess, i in s.guessable_words {
 		for answer, j in s.possible_words {

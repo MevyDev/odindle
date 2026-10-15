@@ -2,6 +2,13 @@ package main
 
 import "core:fmt"
 import "core:mem"
+import "core:os"
+
+entry :: proc() -> int {
+	return 0
+
+
+}
 
 main :: proc() {
 	when ODIN_DEBUG {
@@ -27,4 +34,6 @@ main :: proc() {
 	}
 
 	fmt.println(":3")
+
+	os.exit(entry())
 }

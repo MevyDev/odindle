@@ -22,6 +22,9 @@ Resp :: enum {
 	Correct,
 }
 
+word_set: map[Word]struct{}
+
+
 read_word_file :: proc(path: string) -> []Word {
 	ar: [dynamic]Word
 	defer delete(ar)
@@ -54,6 +57,14 @@ entry :: proc() -> int {
 	defer delete(wordles)
 	nonwordles := read_word_file("nonwordles.txt")
 	defer delete(nonwordles)
+
+	defer delete(word_set)
+	for word in wordles {
+		map_insert(&word_set, word, struct{}{})
+	}
+	for word in nonwordles {
+		map_insert(&word_set, word, struct{}{})
+	}
 
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()

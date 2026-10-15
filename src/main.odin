@@ -57,6 +57,29 @@ feedback_from_string :: proc(s: string) -> (res: Feedback, ok: bool) {
 	return r, true
 }
 
+candidates_update :: proc(
+	s: ^Solver,
+	candidates_old: []Word,
+	guessed_word: Word,
+	fb: Feedback,
+) -> []Word {
+	n := 0
+	for cand in candidates_old {
+		if feedback(guessed_word, cand) == fb {
+			n += 1
+		}
+	}
+	res := make([]Word, n)
+	i := 0
+	for cand in candidates_old {
+		if feedback(guessed_word, cand) == fb {
+			res[i] = cand
+			i += 1
+		}
+	}
+	return res
+}
+
 fill_feedback_table :: proc(s: ^Solver) {
 	for guess, i in s.guessable_words {
 		for answer, j in s.possible_words {
@@ -159,6 +182,15 @@ entry :: proc() -> int {
 
 	guess := minmax(&solver, solver.possible_words)
 	fmt.println(string(guess[:]))
+
+	fb, _ := feedback_from_string("ewwwe")
+	new_cands := candidates_update(&solver, solver.possible_words, guess, fb)
+	for &cand in new_cands {
+		fmt.println(string(cand[:]))
+	}
+	defer delete(new_cands)
+	guess2 := minmax(&solver, new_cands)
+	fmt.println(string(guess2[:]))
 
 	return 0
 }

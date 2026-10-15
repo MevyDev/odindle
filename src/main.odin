@@ -188,6 +188,7 @@ solver_init :: proc(
 	precompute: bool,
 	f: proc(_: ^Solver, _: []int) -> Word,
 ) -> Solver {
+	tick := time.tick_now()
 	n := len(wordles) + len(nonwordles)
 	m := len(wordles)
 	res := Solver {
@@ -208,7 +209,10 @@ solver_init :: proc(
 
 	fill_feedback_table(&res)
 
+	fmt.eprintln("Table filling took", time.tick_since(tick))
+
 	if precompute {
+		tick = time.tick_now()
 		state := state_init(&res)
 		res.best_first = res.f(&res, state.candidates)
 		state_deinit(&state)
@@ -244,8 +248,10 @@ solver_init :: proc(
 				state_deinit(&state)
 			}
 		}
+		fmt.eprintln("Precomputing", time.tick_since(tick))
 	}
 
+	fmt.println("Solver initialized.")
 	return res
 }
 
@@ -479,8 +485,8 @@ entry :: proc() -> int {
 	defer delete(nonwordles)
 
 	tick := time.tick_now()
+	fmt.eprintln("Initializing solver...")
 	solver := solver_init(wordles, nonwordles, false, minmax)
-	fmt.eprintln("Initializing solver took:", time.tick_since(tick))
 	defer solver_deinit(&solver)
 
 	// interactive_solve(&solver)

@@ -132,6 +132,7 @@ newgame_thread :: proc() {
 }
 
 entry :: proc() -> int {
+	rl.SetTraceLogLevel(.NONE)
 	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE)
 	rl.SetTargetFPS(60)
 

@@ -7,6 +7,9 @@ import rl "vendor:raylib"
 WINDOW_WIDTH :: 720
 WINDOW_HEIGHT :: 720
 WINDOW_TITLE :: "gayest wordle game"
+
+BLOCK_SIZE :: 80
+BLOCK_GAP :: 20
 entry :: proc() -> int {
 	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE)
 
@@ -15,6 +18,17 @@ entry :: proc() -> int {
 		defer rl.EndDrawing()
 		rl.ClearBackground(rl.DARKGRAY)
 
+		for i in 0 ..< 6 {
+			for j in 0 ..< 5 {
+				rect := rl.Rectangle {
+					x      = f32(j) * (BLOCK_SIZE + BLOCK_GAP),
+					y      = f32(i) * (BLOCK_SIZE + BLOCK_GAP),
+					width  = BLOCK_SIZE,
+					height = BLOCK_SIZE,
+				}
+				rl.DrawRectangleRec(rect, rl.WHITE)
+			}
+		}
 	}
 
 	return 0

@@ -107,6 +107,19 @@ minmax :: proc(s: ^Solver, candidates: []int) -> Word {
 	return best
 }
 
+get_word :: proc(s: ^Solver, state: ^State) -> Word {
+	guess_word: Word
+	if s.precomputed && state.try == 0 {
+		guess_word = s.best_first
+	} else if s.precomputed && state.try == 1 {
+		guess_word = s.best_second[state.guesses[0].fb]
+	} else if s.precomputed && state.try == 2 {
+		i := int(state.guesses[1].fb) * int(CORRECT_FEEDBACK + 1) + int(state.guesses[0].fb)
+		guess_word = s.best_third[i]
+	} else do guess_word = s.f(s, state.candidates)
+	return guess_word
+}
+
 word_from_string :: proc(s: string) -> (res: Word, ok: bool) {
 	if len(s) != WORD_LEN do return Word{}, false
 	r: Word
@@ -336,15 +349,7 @@ solve_word :: proc(s: ^Solver, answer: Word) -> (tries: int, elapsed: time.Durat
 	fb: Feedback
 	// TODO: refactor this into the solve functions themselves
 	for len(state.candidates) > 1 {
-		guess_word: Word
-		if s.precomputed && state.try == 0 {
-			guess_word = s.best_first
-		} else if s.precomputed && state.try == 1 {
-			guess_word = s.best_second[state.guesses[0].fb]
-		} else if s.precomputed && state.try == 2 {
-			i := int(state.guesses[1].fb) * int(CORRECT_FEEDBACK + 1) + int(state.guesses[0].fb)
-			guess_word = s.best_third[i]
-		} else do guess_word = s.f(s, state.candidates)
+		guess_word := get_word(s, &state)
 
 		fb = feedback(guess_word, answer)
 		guess := Guess{guess_word, fb}
@@ -367,20 +372,8 @@ interact_gui_spec :: proc(s: ^Solver) {
 	state: State
 	running: bool
 	buf: [256]byte
-	guess_word: Word
 	for true {
-		if running {
-			if s.precomputed && state.try == 0 {
-				guess_word = s.best_first
-			} else if s.precomputed && state.try == 1 {
-				guess_word = s.best_second[state.guesses[0].fb]
-			} else if s.precomputed && state.try == 2 {
-				i :=
-					int(state.guesses[1].fb) * int(CORRECT_FEEDBACK + 1) + int(state.guesses[0].fb)
-				guess_word = s.best_third[i]
-			} else do guess_word = s.f(s, state.candidates)
-			fmt.println(string(guess_word[:]))
-		}
+		guess_word := get_word(s, &state)
 
 		line, ok := read_line(buf[:])
 		if !ok do continue

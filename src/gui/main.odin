@@ -6,6 +6,7 @@ import "core:fmt"
 import "core:math/rand"
 import "core:os"
 import "core:strings"
+import "core:sync"
 import "core:thread"
 import "core:time"
 import rl "vendor:raylib"
@@ -13,6 +14,8 @@ import rl "vendor:raylib"
 WINDOW_WIDTH :: 720
 WINDOW_HEIGHT :: 720
 WINDOW_TITLE :: "gayest wordle game"
+
+SAMPLE_COUNT :: 500
 
 BLOCK_SIZE :: 80
 BLOCK_GAP :: 20
@@ -37,11 +40,53 @@ Game :: struct {
 	feedbacks: [GUESS_COUNT][WORD_LEN]Resp,
 }
 
+Sample :: struct {
+	elapsed: time.Duration,
+	tries:   int,
+}
+
+sample_ar: [dynamic]Sample
+sample_mutex: sync.Mutex
+
 last_game: Game
 game: Game
 
 wordles: []Word
 nonwordles: []Word
+
+register_sample :: proc(sample: Sample) {
+	sync.mutex_guard(&sample_mutex)
+	append(&sample_ar, sample)
+	if len(sample_ar) > SAMPLE_COUNT do pop_front(&sample_ar)
+}
+
+// TODO: race condition
+sample_info_string :: proc() -> string {
+	n := 0
+	total_elapsed: time.Duration
+	total_tries := 0
+	{
+		sync.mutex_guard(&sample_mutex)
+		n = len(sample_ar)
+		for sample in sample_ar {
+			total_elapsed += sample.elapsed
+			total_tries += sample.tries
+		}
+	}
+	if n == 0 {
+		return fmt.aprint("Waiting for the engine")
+	}
+	avg_elapsed := total_elapsed / time.Duration(n)
+	games_per_second := 1 / time.duration_seconds(avg_elapsed)
+	avg_tries := f64(total_tries) / f64(n)
+	res := fmt.aprintf(
+		"Average time per game: %2.2fms\nGames per second: %4f\nAverage try count: %.2f",
+		time.duration_milliseconds(avg_elapsed),
+		games_per_second,
+		avg_tries,
+	)
+	return res
+}
 
 string_from_feedback :: proc(feedback: [WORD_LEN]Resp) -> [WORD_LEN]byte {
 	res: [WORD_LEN]byte
@@ -162,11 +207,23 @@ entry :: proc() -> int {
 		defer rl.EndDrawing()
 		rl.ClearBackground(rl.DARKGRAY)
 
+		info := sample_info_string()
+		defer delete(info)
+		cinfo := strings.clone_to_cstring(info)
+		defer delete(cinfo)
+		info_len := rl.MeasureText(cinfo, 20)
+		info_x := (WINDOW_WIDTH - info_len) / 2
+		rl.DrawText(cinfo, info_x, 0, 20, rl.WHITE)
+
+		grid_width: f32 = (BLOCK_SIZE + BLOCK_GAP) * WORD_LEN - BLOCK_GAP
+		grid_height: f32 = (BLOCK_SIZE + BLOCK_GAP) * GUESS_COUNT - BLOCK_GAP
+		lx := (WINDOW_WIDTH - grid_width) / 2
+		tx := (WINDOW_HEIGHT - grid_height) / 2
 		for i in 0 ..< GUESS_COUNT {
 			for j in 0 ..< WORD_LEN {
 				rect := rl.Rectangle {
-					x      = f32(j) * (BLOCK_SIZE + BLOCK_GAP),
-					y      = f32(i) * (BLOCK_SIZE + BLOCK_GAP),
+					x      = f32(j) * (BLOCK_SIZE + BLOCK_GAP) + lx,
+					y      = f32(i) * (BLOCK_SIZE + BLOCK_GAP) + tx,
 					width  = BLOCK_SIZE,
 					height = BLOCK_SIZE,
 				}
@@ -243,6 +300,7 @@ newgame :: proc() -> (quit: bool) {
 	// fmt.eprintfln("Word %s guessed in %d tries.", string(game.answer[:]), game.try)
 	// fmt.eprintfln("Took %v.", time.tick_since(tick_start))
 	last_game = game
+	register_sample({elapsed = time.tick_since(tick_start), tries = game.try})
 	return false
 }
 

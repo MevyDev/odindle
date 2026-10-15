@@ -118,6 +118,15 @@ random_word :: proc() -> Word {
 	return wordles[i]
 }
 
+word_from_string :: proc(s: string) -> (res: Word, ok: bool) {
+	if len(s) != WORD_LEN do return Word{}, false
+	r: Word
+	for i in 0 ..< WORD_LEN {
+		r[i] = s[i]
+	}
+	return r, true
+}
+
 entry :: proc() -> int {
 	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE)
 

@@ -389,6 +389,9 @@ interact_gui_spec :: proc(s: ^Solver) {
 	buf: [256]byte
 	for true {
 		guess_word := get_word(s, &state)
+		if running {
+			fmt.println(string(guess_word[:]))
+		}
 
 		line, ok := read_line(buf[:])
 		if !ok do continue
@@ -509,7 +512,7 @@ entry :: proc() -> int {
 
 	// interactive_solve(&solver)
 	benchmark(&solver, solver.possible_words[:])
-	// interact_gui_spec(&solver)
+	interact_gui_spec(&solver)
 
 	return 0
 }

@@ -35,6 +35,17 @@ Game :: struct {
 
 game := Game{}
 
+string_from_feedback :: proc(feedback: [WORD_LEN]Resp) -> [WORD_LEN]byte {
+	res: [WORD_LEN]byte
+	for r, i in feedback {
+		if r == .None do res[i] = '0'
+		if r == .Wrong do res[i] = 'w'
+		if r == .Elsewhere do res[i] = 'e'
+		if r == .Correct do res[i] = 'c'
+	}
+	return res
+}
+
 feedback_give :: proc(guess: Word) -> [WORD_LEN]Resp {
 	answer := game.answer
 	counts: [26]u8

@@ -9,6 +9,13 @@ WORD_LEN :: 5
 Word :: [5]byte
 Feedback :: u8
 
+Solver :: struct {
+	guessable_words:        []Word,
+	possible_words:         []Word,
+	backing_feedback_table: []Feedback,
+	feedback_table:         [][]Feedback,
+}
+
 feedback :: proc(guess: Word, answer: Word) -> Feedback {
 	counts: [26]u8
 	colors: [WORD_LEN]u8 // 0 gray 1 yellow 2 green

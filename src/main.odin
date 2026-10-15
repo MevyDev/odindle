@@ -10,6 +10,7 @@ import "core:time"
 
 WORD_LEN :: 5
 CORRECT_FEEDBACK: Feedback : 242
+FEEDBACK_COUNT :: int(CORRECT_FEEDBACK) + 1
 
 Word :: [WORD_LEN]byte
 Feedback :: u8
@@ -20,10 +21,7 @@ Solver :: struct {
 	possible_words:         []Word,
 	backing_feedback_table: []Feedback,
 	feedback_table:         [][]Feedback,
-	precomputed:            bool,
-	best_first:             Word,
-	best_second:            []Word,
-	best_third:             []Word,
+	precomp_table:          [][]Word,
 }
 
 Guess :: struct {
@@ -107,16 +105,20 @@ minmax :: proc(s: ^Solver, candidates: []int) -> Word {
 	return best
 }
 
+precomp_get :: proc(s: ^Solver, state: ^State) -> Word {
+	if len(s.precomp_table) <= state.try do return Word{}
+	i := 0
+	p := 1
+	for guess in state.guesses {
+		i += int(guess.fb) * p
+		p *= FEEDBACK_COUNT
+	}
+	return s.precomp_table[state.try][i]
+}
+
 get_word :: proc(s: ^Solver, state: ^State) -> Word {
-	guess_word: Word
-	if s.precomputed && state.try == 0 {
-		guess_word = s.best_first
-	} else if s.precomputed && state.try == 1 {
-		guess_word = s.best_second[state.guesses[0].fb]
-	} else if s.precomputed && state.try == 2 {
-		i := int(state.guesses[1].fb) * int(CORRECT_FEEDBACK + 1) + int(state.guesses[0].fb)
-		guess_word = s.best_third[i]
-	} else do guess_word = s.f(s, state.candidates)
+	guess_word := precomp_get(s, state)
+	if guess_word == (Word{}) do guess_word = s.f(s, state.candidates)
 	return guess_word
 }
 
@@ -194,7 +196,7 @@ fill_feedback_table :: proc(s: ^Solver) {
 solver_init :: proc(
 	wordles: []Word,
 	nonwordles: []Word,
-	precompute: bool,
+	precompute_to: int,
 	f: proc(_: ^Solver, _: []int) -> Word,
 ) -> Solver {
 	tick := time.tick_now()
@@ -206,7 +208,7 @@ solver_init :: proc(
 		possible_words         = make([]Word, m),
 		backing_feedback_table = make([]Feedback, n * m),
 		feedback_table         = make([][]Feedback, n),
-		precomputed            = precompute,
+		precomp_table          = make([][]Word, precompute_to),
 	}
 	for i in 0 ..< n {
 		res.feedback_table[i] = res.backing_feedback_table[i * m:(i + 1) * m]
@@ -220,46 +222,41 @@ solver_init :: proc(
 
 	fmt.eprintln("Table filling took", time.tick_since(tick))
 
-	if precompute {
-		tick = time.tick_now()
-		state := state_init(&res)
-		res.best_first = res.f(&res, state.candidates)
-		state_deinit(&state)
-
-		feedbacks := all_possible_feedbacks()
-		res.best_second = make([]Word, len(feedbacks))
-		for f in feedbacks {
-			state = state_init(&res)
-			guess := Guess {
-				word = res.best_first,
-				fb   = f,
-			}
-			state_update(&res, &state, guess)
-			res.best_second[f] = res.f(&res, state.candidates)
-			state_deinit(&state)
-		}
-
-		res.best_third = make([]Word, len(feedbacks) * len(feedbacks))
-		for f1 in feedbacks {
-			state1 := state_init(&res)
-			defer state_deinit(&state1)
-			guess1 := Guess {
-				word = res.best_first,
-				fb   = f1,
-			}
-			state_update(&res, &state1, guess1)
-			for f2 in feedbacks {
-				state2 := state_init_clone(&state1)
-				defer state_deinit(&state2)
-				guess2 := Guess {
-					word = res.best_second[f1],
-					fb   = f2,
+	feedback_n := 1
+	for lvl in 0 ..< precompute_to {
+		fmt.eprintfln("Filling precompute table lvl %d...", lvl + 1)
+		lvl_tick := time.tick_now()
+		res.precomp_table[lvl] = make([]Word, feedback_n)
+		for idx in 0 ..< feedback_n {
+			state := state_init(&res)
+			defer state_deinit(&state)
+			t := idx
+			last_mfb := 0
+			p := 1
+			reachable := true
+			for step in 0 ..< lvl {
+				fb := Feedback(t % FEEDBACK_COUNT)
+				t /= FEEDBACK_COUNT
+				word := res.precomp_table[step][last_mfb]
+				// parent entry was skipped, so this state is unreachable too
+				if word == (Word{}) {
+					reachable = false
+					break
 				}
-				state_update(&res, &state2, guess2)
-				res.best_third[int(f2) * len(feedbacks) + int(f1)] = res.f(&res, state2.candidates)
+				guess := Guess {
+					word = word,
+					fb   = fb,
+				}
+				state_update(&res, &state, guess)
+				last_mfb += p * int(fb)
+				p *= FEEDBACK_COUNT
 			}
+			// Word{} makes get_word fall back to s.f
+			if !reachable || len(state.candidates) == 0 do continue
+			res.precomp_table[lvl][idx] = res.f(&res, state.candidates)
 		}
-		fmt.eprintln("Precomputing", time.tick_since(tick))
+		feedback_n *= FEEDBACK_COUNT
+		fmt.eprintln("Filling lvl", lvl + 1, "took", time.tick_since(lvl_tick))
 	}
 
 	fmt.println("Solver initialized.")
@@ -271,7 +268,10 @@ solver_deinit :: proc(s: ^Solver) {
 	delete(s.possible_words)
 	delete(s.feedback_table)
 	delete(s.backing_feedback_table)
-	if s.precomputed do delete(s.best_second)
+	for i in 0 ..< len(s.precomp_table) {
+		delete(s.precomp_table[i])
+	}
+	delete(s.precomp_table)
 }
 
 feedback :: proc(guess: Word, answer: Word) -> Feedback {
@@ -386,8 +386,8 @@ interact_gui_spec :: proc(s: ^Solver) {
 			}
 			running = false
 		} else if running {
-			fb, ok := feedback_from_string(line)
-			if !ok {
+			fb, okfstr := feedback_from_string(line)
+			if !okfstr {
 				fmt.println("quit")
 				return
 			}
@@ -480,12 +480,12 @@ entry :: proc() -> int {
 
 	tick := time.tick_now()
 	fmt.eprintln("Initializing solver...")
-	solver := solver_init(wordles, nonwordles, true, minmax)
+	solver := solver_init(wordles, nonwordles, 3, minmax)
 	defer solver_deinit(&solver)
 
 	// interactive_solve(&solver)
 	benchmark(&solver, solver.possible_words[:])
-	interact_gui_spec(&solver)
+	// interact_gui_spec(&solver)
 
 	return 0
 }

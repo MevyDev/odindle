@@ -7,6 +7,7 @@ import "core:math/rand"
 import "core:os"
 import "core:strings"
 import "core:thread"
+import "core:time"
 import rl "vendor:raylib"
 
 WINDOW_WIDTH :: 720
@@ -201,6 +202,7 @@ read_line :: proc(buf: []byte) -> (res: string, ok: bool) {
 }
 
 newgame :: proc() -> (quit: bool) {
+	tick_start := time.tick_now()
 	fmt.printfln("newgame %d %d", WORD_LEN, GUESS_COUNT)
 	game = Game{}
 	game.answer = random_word()
@@ -219,7 +221,6 @@ newgame :: proc() -> (quit: bool) {
 			fmt.println("huh")
 			continue
 		}
-		fmt.eprintln(">", string(word[:]))
 
 		if word not_in word_set {
 			fmt.println("huh")
@@ -237,7 +238,10 @@ newgame :: proc() -> (quit: bool) {
 			break
 		}
 	}
-	fmt.println("done")
+	// fmt.println("done")
+	fmt.eprintfln("Word %s guessed in %d tries.", string(game.answer[:]), game.try)
+	fmt.eprintfln("Took %v.", time.tick_since(tick_start))
+	last_game = game
 	return false
 }
 

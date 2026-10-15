@@ -37,7 +37,8 @@ Game :: struct {
 	feedbacks: [GUESS_COUNT][WORD_LEN]Resp,
 }
 
-game := Game{}
+last_game: Game
+game: Game
 
 wordles: []Word
 nonwordles: []Word
@@ -171,14 +172,14 @@ entry :: proc() -> int {
 				}
 
 				col: rl.Color
-				resp := game.feedbacks[i][j]
+				resp := last_game.feedbacks[i][j]
 				if resp == .None do col = rl.GRAY
 				if resp == .Wrong do col = rl.WHITE
 				if resp == .Elsewhere do col = rl.SKYBLUE
 				if resp == .Correct do col = rl.PINK
 				rl.DrawRectangleRec(rect, col)
 
-				c := game.guesses[i][j]
+				c := last_game.guesses[i][j]
 				if c == 0 do c = ' '
 				rl.DrawTextCodepoint(
 					rl.GetFontDefault(),

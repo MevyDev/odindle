@@ -17,11 +17,9 @@ Solver :: struct {
 }
 
 fill_feedback_table :: proc(s: ^Solver) {
-	n := len(s.guessable_words)
-	m := len(s.possible_words)
-	for i in 0 ..< n {
-		for j in 0 ..< m {
-			s.feedback_table[i][j] = feedback(s.guessable_words[i], s.possible_words[j])
+	for guess, i in s.guessable_words {
+		for answer, j in s.possible_words {
+			s.feedback_table[i][j] = feedback(guess, answer)
 		}
 	}
 }

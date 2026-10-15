@@ -60,7 +60,6 @@ register_sample :: proc(sample: Sample) {
 	if len(sample_ar) > SAMPLE_COUNT do pop_front(&sample_ar)
 }
 
-// TODO: race condition
 sample_info_string :: proc() -> string {
 	n := 0
 	total_elapsed: time.Duration

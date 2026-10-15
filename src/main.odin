@@ -227,34 +227,57 @@ solver_init :: proc(
 		fmt.eprintfln("Filling precompute table lvl %d...", lvl + 1)
 		lvl_tick := time.tick_now()
 		res.precomp_table[lvl] = make([]Word, feedback_n)
-		for idx in 0 ..< feedback_n {
-			state := state_init(&res)
-			defer state_deinit(&state)
-			t := idx
-			last_mfb := 0
-			p := 1
-			reachable := true
-			for step in 0 ..< lvl {
-				fb := Feedback(t % FEEDBACK_COUNT)
-				t /= FEEDBACK_COUNT
-				word := res.precomp_table[step][last_mfb]
-				// parent entry was skipped, so this state is unreachable too
-				if word == (Word{}) {
-					reachable = false
-					break
-				}
-				guess := Guess {
-					word = word,
-					fb   = fb,
-				}
-				state_update(&res, &state, guess)
-				last_mfb += p * int(fb)
-				p *= FEEDBACK_COUNT
-			}
-			// Word{} makes get_word fall back to s.f
-			if !reachable || len(state.candidates) == 0 do continue
-			res.precomp_table[lvl][idx] = res.f(&res, state.candidates)
+
+		Task :: struct {
+			s:      ^Solver,
+			lvl:    int,
+			lo, hi: int,
 		}
+
+		worker :: proc(t: Task) {
+			for idx in t.lo ..< t.hi {
+				state := state_init(t.s)
+				defer state_deinit(&state)
+				m := idx
+				last_mfb := 0
+				p := 1
+				reachable := true
+				for step in 0 ..< t.lvl {
+					fb := Feedback(m % FEEDBACK_COUNT)
+					m /= FEEDBACK_COUNT
+					word := t.s.precomp_table[step][last_mfb]
+					// parent entry was skipped, so this state is unreachable too
+					if word == (Word{}) {
+						reachable = false
+						break
+					}
+					guess := Guess {
+						word = word,
+						fb   = fb,
+					}
+					state_update(t.s, &state, guess)
+					last_mfb += p * int(fb)
+					p *= FEEDBACK_COUNT
+				}
+				// Word{} makes get_word fall back to s.f
+				if !reachable || len(state.candidates) == 0 do continue
+				t.s.precomp_table[t.lvl][idx] = t.s.f(t.s, state.candidates)
+			}
+		}
+
+		thread_n := max(os.get_processor_core_count(), 1) // idk if this works
+		chunk := (feedback_n + thread_n - 1) / thread_n
+
+		threads: [dynamic]^thread.Thread
+		defer delete(threads)
+		for lo := 0; lo < feedback_n; lo += chunk {
+			hi := math.min(lo + chunk, feedback_n)
+			t := thread.create_and_start_with_poly_data(Task{&res, lvl, lo, hi}, worker)
+			append(&threads, t)
+		}
+		thread.join_multiple(..threads[:])
+		for t in threads do thread.destroy(t)
+
 		feedback_n *= FEEDBACK_COUNT
 		fmt.eprintln("Filling lvl", lvl + 1, "took", time.tick_since(lvl_tick))
 	}
@@ -473,6 +496,7 @@ benchmark :: proc(s: ^Solver, words: []Word) -> (avg: f32, elapsed: time.Duratio
 }
 
 entry :: proc() -> int {
+	fmt.eprintfln("Detected %d cores.", os.get_processor_core_count())
 	wordles := read_word_file("wordles.txt")
 	defer delete(wordles)
 	nonwordles := read_word_file("nonwordles.txt")

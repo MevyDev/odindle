@@ -32,6 +32,7 @@ Guess :: struct {
 }
 
 State :: struct {
+	cand_buf:   []int,
 	candidates: []int,
 	guesses:    [dynamic]Guess,
 	try:        int,
@@ -134,22 +135,17 @@ feedback_from_string :: proc(s: string) -> (res: Feedback, ok: bool) {
 	return r, true
 }
 
-candidates_update :: proc(s: ^Solver, candidates_old: []int, guess: Guess) -> []int {
-	n := 0
-	for cand in candidates_old {
-		if feedback(guess.word, s.guessable_words[cand]) == guess.fb {
-			n += 1
+candidates_update :: proc(s: ^Solver, candidates: []int, guess: Guess) -> []int {
+	n := len(candidates)
+	j := 0
+	for i := 0; i < n; i += 1 {
+		answer := s.guessable_words[candidates[i]]
+		if feedback(guess.word, answer) == guess.fb {
+			candidates[j] = candidates[i]
+			j += 1
 		}
 	}
-	res := make([]int, n)
-	i := 0
-	for cand in candidates_old {
-		if feedback(guess.word, s.guessable_words[cand]) == guess.fb {
-			res[i] = cand
-			i += 1
-		}
-	}
-	return res
+	return candidates[:j]
 }
 
 fill_feedback_table :: proc(s: ^Solver) {
@@ -293,9 +289,7 @@ feedback :: proc(guess: Word, answer: Word) -> Feedback {
 }
 
 state_update :: proc(s: ^Solver, state: ^State, guess: Guess) {
-	new_candidates := candidates_update(s, state.candidates, guess)
-	delete(state.candidates)
-	state.candidates = new_candidates
+	state.candidates = candidates_update(s, state.candidates, guess)
 	append(&state.guesses, guess)
 	if guess.fb != CORRECT_FEEDBACK do state.try += 1
 }
@@ -308,15 +302,17 @@ read_line :: proc(buf: []byte) -> (res: string, ok: bool) {
 
 state_init :: proc(s: ^Solver) -> State {
 	state: State
-	state.candidates = make([]int, len(s.possible_words))
-	for &b, i in state.candidates {
-		b = i
+	state.cand_buf = make([]int, len(s.possible_words))
+	for i in 0 ..< len(s.possible_words) {
+		state.cand_buf[i] = i
 	}
+	state.candidates = state.cand_buf[:]
 	return state
 }
 
 state_deinit :: proc(state: ^State) {
-	delete(state.candidates)
+	delete(state.cand_buf)
+	delete(state.guesses)
 }
 
 solve_word :: proc(s: ^Solver, answer: Word) -> (tries: int, elapsed: time.Duration) {
@@ -486,7 +482,7 @@ entry :: proc() -> int {
 
 	tick := time.tick_now()
 	fmt.eprintln("Initializing solver...")
-	solver := solver_init(wordles, nonwordles, false, minmax)
+	solver := solver_init(wordles, nonwordles, true, minmax)
 	defer solver_deinit(&solver)
 
 	// interactive_solve(&solver)

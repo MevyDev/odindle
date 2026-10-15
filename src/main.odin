@@ -404,6 +404,7 @@ read_word_file :: proc(path: string) -> []Word {
 }
 
 benchmark :: proc(s: ^Solver, words: []Word) -> (avg: f32, elapsed: time.Duration) {
+	fmt.eprintln("Benchmarking...")
 	total_time: time.Duration
 	total_tries: int
 	for answer in words {
@@ -413,8 +414,8 @@ benchmark :: proc(s: ^Solver, words: []Word) -> (avg: f32, elapsed: time.Duratio
 	}
 	avg_tries := f32(total_tries) / f32(len(words))
 	fmt.eprintln("All guesses took:", total_time)
-	fmt.eprintln("Total tries: ", total_tries)
-	fmt.eprintln("Average tries per word: ", avg_tries)
+	fmt.eprintln("Total tries:", total_tries)
+	fmt.eprintln("Average tries per word:", avg_tries)
 	return avg_tries, total_time
 }
 
@@ -430,7 +431,7 @@ entry :: proc() -> int {
 	defer solver_deinit(&solver)
 
 	// interactive_solve(&solver)
-	benchmark(&solver, solver.possible_words[:100])
+	// benchmark(&solver, solver.possible_words[:100])
 	interact_gui_spec(&solver)
 
 	return 0

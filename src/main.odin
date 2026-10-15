@@ -38,10 +38,40 @@ feedback :: proc(guess: Word, answer: Word) -> Feedback {
 	return res
 }
 
+read_word_file :: proc(path: string) -> []Word {
+	ar: [dynamic]Word
+	defer delete(ar)
+	contents, _ := os.read_entire_file(path, context.allocator)
+	defer delete(contents)
+	i := 0
+	j := 0
+	for b in contents {
+		if b == '\r' do continue
+		if b == '\n' {
+			if j != WORD_LEN do panic("Word file contains words of different length")
+			j = 0
+			i += 1
+		} else {
+			if j >= WORD_LEN do panic("Word file contains words of different length")
+			resize(&ar, i + 1)
+			ar[i][j] = b
+			j += 1
+		}
+	}
+	res := make([]Word, len(ar))
+	for i in 0 ..< len(ar) {
+		res[i] = ar[i]
+	}
+	return res
+}
+
 entry :: proc() -> int {
+	wordles := read_word_file("wordles.txt")
+	defer delete(wordles)
+	nonwordles := read_word_file("nonwordles.txt")
+	defer delete(nonwordles)
+
 	return 0
-
-
 }
 
 main :: proc() {

@@ -201,13 +201,22 @@ newgame :: proc() -> (quit: bool) {
 	buf: [256]byte
 	for true {
 		line, ok := read_line(buf[:])
-		if !ok do continue
+		if !ok {
+			fmt.println("huh")
+			continue
+		}
 		if line == "quit" do return true
 
 		word, okword := word_from_string(line)
-		if !okword do continue
+		if !okword {
+			fmt.println("huh")
+			continue
+		}
 
-		if word not_in word_set do continue
+		if word not_in word_set {
+			fmt.println("huh")
+			continue
+		}
 
 		fb := make_guess(word)
 		if word == game.answer {

@@ -22,6 +22,7 @@ Solver :: struct {
 	precomputed:            bool,
 	best_first:             Word,
 	best_second:            []Word,
+	best_third:             []Word,
 }
 
 Guess :: struct {
@@ -199,6 +200,25 @@ solver_init :: proc(
 			res.best_second[f] = res.f(&res, state.candidates)
 			state_deinit(&state)
 		}
+
+		res.best_third = make([]Word, len(feedbacks) * len(feedbacks))
+		for f1 in feedbacks {
+			for f2 in feedbacks {
+				state = state_init(&res)
+				guess1 := Guess {
+					word = res.best_first,
+					fb   = f1,
+				}
+				state_update(&res, &state, guess1)
+				guess2 := Guess {
+					word = res.best_second[f1],
+					fb   = f2,
+				}
+				state_update(&res, &state, guess2)
+				res.best_third[int(f2) * len(feedbacks) + int(f1)] = res.f(&res, state.candidates)
+				state_deinit(&state)
+			}
+		}
 	}
 
 	return res
@@ -274,12 +294,16 @@ solve_word :: proc(s: ^Solver, answer: Word) -> (tries: int, elapsed: time.Durat
 	defer state_deinit(&state)
 
 	fb: Feedback
+	// TODO: refactor this into the solve functions themselves
 	for len(state.candidates) > 1 {
 		guess_word: Word
 		if s.precomputed && state.try == 0 {
 			guess_word = s.best_first
 		} else if s.precomputed && state.try == 1 {
 			guess_word = s.best_second[state.guesses[0].fb]
+		} else if s.precomputed && state.try == 2 {
+			i := int(state.guesses[1].fb) * int(CORRECT_FEEDBACK + 1) + int(state.guesses[0].fb)
+			guess_word = s.best_third[i]
 		} else do guess_word = s.f(s, state.candidates)
 
 		fb = feedback(guess_word, answer)
@@ -310,6 +334,10 @@ interact_gui_spec :: proc(s: ^Solver) {
 				guess_word = s.best_first
 			} else if s.precomputed && state.try == 1 {
 				guess_word = s.best_second[state.guesses[0].fb]
+			} else if s.precomputed && state.try == 2 {
+				i :=
+					int(state.guesses[1].fb) * int(CORRECT_FEEDBACK + 1) + int(state.guesses[0].fb)
+				guess_word = s.best_third[i]
 			} else do guess_word = s.f(s, state.candidates)
 			fmt.println(string(guess_word[:]))
 		}
@@ -431,7 +459,7 @@ entry :: proc() -> int {
 	defer solver_deinit(&solver)
 
 	// interactive_solve(&solver)
-	// benchmark(&solver, solver.possible_words[:100])
+	benchmark(&solver, solver.possible_words[:])
 	interact_gui_spec(&solver)
 
 	return 0

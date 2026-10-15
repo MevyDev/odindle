@@ -5,6 +5,7 @@ import "core:math"
 import "core:mem"
 import "core:os"
 import "core:strings"
+import "core:thread"
 import "core:time"
 
 WORD_LEN :: 5
@@ -152,11 +153,33 @@ candidates_update :: proc(s: ^Solver, candidates_old: []int, guess: Guess) -> []
 }
 
 fill_feedback_table :: proc(s: ^Solver) {
-	for guess, i in s.guessable_words {
-		for answer, j in s.possible_words {
-			s.feedback_table[i][j] = feedback(guess, answer)
+	Task :: struct {
+		s:      ^Solver,
+		lo, hi: int,
+	}
+
+	worker :: proc(t: Task) {
+		for i in t.lo ..< t.hi {
+			guess := t.s.guessable_words[i]
+			for answer, j in t.s.possible_words {
+				t.s.feedback_table[i][j] = feedback(guess, answer)
+			}
 		}
 	}
+
+	n := len(s.guessable_words)
+	thread_n := max(os.get_processor_core_count(), 1) // idk if this works
+	chunk := (n + thread_n - 1) / thread_n
+
+	threads: [dynamic]^thread.Thread
+	defer delete(threads)
+	for lo := 0; lo < n; lo += chunk {
+		hi := math.min(lo + chunk, n)
+		t := thread.create_and_start_with_poly_data(Task{s, lo, hi}, worker)
+		append(&threads, t)
+	}
+	thread.join_multiple(..threads[:])
+	for t in threads do thread.destroy(t)
 }
 
 solver_init :: proc(
@@ -456,7 +479,7 @@ entry :: proc() -> int {
 	defer delete(nonwordles)
 
 	tick := time.tick_now()
-	solver := solver_init(wordles, nonwordles, true, minmax)
+	solver := solver_init(wordles, nonwordles, false, minmax)
 	fmt.eprintln("Initializing solver took:", time.tick_since(tick))
 	defer solver_deinit(&solver)
 

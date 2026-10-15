@@ -49,9 +49,10 @@ all_possible_feedbacks :: proc() -> []Feedback {
 }
 
 entropy :: proc(s: ^Solver, candidates: []int) -> Word {
+	assert(len(candidates) != 0)
 	feedback_counts := make([]f64, int(math.pow(3., WORD_LEN) + 10))
 	defer delete(feedback_counts)
-	best := [5]byte{'i', 'n', 'v', 'l', 'd'}
+	best: [5]byte
 	score_best: f64 = -1.
 	for guess, i in s.guessable_words {
 		in_candidates: bool
@@ -74,14 +75,14 @@ entropy :: proc(s: ^Solver, candidates: []int) -> Word {
 		}
 		mem.zero_slice(feedback_counts)
 	}
-	assert(best != [5]byte{'i', 'n', 'v', 'l', 'd'})
+	assert(best != [5]byte{})
 	return best
 }
 
 minmax :: proc(s: ^Solver, candidates: []int) -> Word {
 	feedback_counts := make([]i16, int(math.pow(3., WORD_LEN) + 10))
 	defer delete(feedback_counts)
-	best := [5]byte{'i', 'n', 'v', 'l', 'd'}
+	best: [5]byte
 	best_count: i16 = 30_000
 	for guess, i in s.guessable_words {
 		in_candidates: bool
@@ -100,6 +101,7 @@ minmax :: proc(s: ^Solver, candidates: []int) -> Word {
 		}
 		mem.zero_slice(feedback_counts)
 	}
+	assert(best != [5]byte{})
 	return best
 }
 

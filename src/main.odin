@@ -301,6 +301,48 @@ solve_word :: proc(s: ^Solver, answer: Word) -> (tries: int, elapsed: time.Durat
 	return try, elapsed_tick
 }
 
+interact_gui_spec :: proc(s: ^Solver) {
+	state: State
+	running: bool
+	buf: [256]byte
+	guess_word: Word
+	for true {
+		if running {
+			guess_word = s.f(s, state.candidates)
+			fmt.println(string(guess_word[:]))
+		}
+
+		line, ok := read_line(buf[:])
+		if !ok do continue
+
+		if line == "quit" {
+			if running do state_deinit(&state)
+			return
+		}
+
+		// TODO: actually work with the other parameters
+		if len(line) >= len("newgame") && line[:len("newgame")] == "newgame" {
+			if running do state_deinit(&state)
+			running = true
+			state = state_init(s)
+			fmt.println("ok")
+		} else if line == "done" {
+			if running {
+				state_deinit(&state)
+			}
+		} else if running {
+			fb, ok := feedback_from_string(line)
+			if !ok {
+				fmt.println("quit")
+				return
+			}
+			guess := Guess{guess_word, fb}
+			state_update(s, &state, guess)
+			fmt.eprintln(len(state.candidates))
+		}
+	}
+}
+
 interactive_solve :: proc(s: ^Solver) {
 	state := state_init(s)
 	defer state_deinit(&state)
@@ -369,9 +411,9 @@ benchmark :: proc(s: ^Solver, words: []Word) -> (avg: f32, elapsed: time.Duratio
 		total_tries += tries
 	}
 	avg_tries := f32(total_tries) / f32(len(words))
-	fmt.println("All guesses took:", total_time)
-	fmt.println("Total tries: ", total_tries)
-	fmt.println("Average tries per word: ", avg_tries)
+	fmt.eprintln("All guesses took:", total_time)
+	fmt.eprintln("Total tries: ", total_tries)
+	fmt.eprintln("Average tries per word: ", avg_tries)
 	return avg_tries, total_time
 }
 
@@ -386,8 +428,9 @@ entry :: proc() -> int {
 	fmt.eprintln("Initializing solver took:", time.tick_since(tick))
 	defer solver_deinit(&solver)
 
-	interactive_solve(&solver)
-	// benchmark(&solver, solver.possible_words[:])
+	// interactive_solve(&solver)
+	benchmark(&solver, solver.possible_words[:])
+	interact_gui_spec(&solver)
 
 	return 0
 }
@@ -418,7 +461,7 @@ main :: proc() {
 		}
 	}
 
-	fmt.println(":3")
+	fmt.eprintln(":3")
 
 	exit_code = entry()
 }

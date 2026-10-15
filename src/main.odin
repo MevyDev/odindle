@@ -429,7 +429,7 @@ entry :: proc() -> int {
 	defer solver_deinit(&solver)
 
 	// interactive_solve(&solver)
-	benchmark(&solver, solver.possible_words[:])
+	benchmark(&solver, solver.possible_words[:100])
 	interact_gui_spec(&solver)
 
 	return 0

@@ -6,6 +6,7 @@ import "core:fmt"
 import "core:math/rand"
 import "core:os"
 import "core:strings"
+import "core:thread"
 import rl "vendor:raylib"
 
 WINDOW_WIDTH :: 720
@@ -126,8 +127,13 @@ word_from_string :: proc(s: string) -> (res: Word, ok: bool) {
 	return r, true
 }
 
+newgame_thread :: proc() {
+	for !newgame() {}
+}
+
 entry :: proc() -> int {
 	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE)
+	rl.SetTargetFPS(60)
 
 	wordles = read_word_file("wordles.txt")
 	defer delete(wordles)
@@ -146,7 +152,7 @@ entry :: proc() -> int {
 	word, _ := word_from_string("hello")
 	make_guess(word)
 
-	for !newgame() {}
+	thread.create_and_start(newgame_thread)
 
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()

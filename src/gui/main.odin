@@ -1,5 +1,6 @@
 package wordle_gui
 
+import "core:c"
 import "core:fmt"
 import "core:os"
 import "core:strings"
@@ -26,9 +27,40 @@ Resp :: enum {
 word_set: map[Word]struct{}
 
 Game :: struct {
-	answer:      Word,
-	char_matrix: [GUESS_COUNT]Word,
-	feedbacks:   [GUESS_COUNT][WORD_LEN]Resp,
+	answer:    Word,
+	try:       int,
+	guesses:   [GUESS_COUNT]Word,
+	feedbacks: [GUESS_COUNT][WORD_LEN]Resp,
+}
+
+game := Game{}
+
+feedback_give :: proc(guess: Word) -> [WORD_LEN]Resp {
+	answer := game.answer
+	counts: [26]u8
+	res: [WORD_LEN]Resp
+	for i in 0 ..< WORD_LEN {
+		if guess[i] == answer[i] {
+			res[i] = .Correct
+		} else {
+			counts[answer[i] - 'a'] += 1
+		}
+	}
+
+	for i in 0 ..< WORD_LEN {
+		c := guess[i] - 'a'
+		if res[i] == .None {
+			if counts[c] > 0 {
+				res[i] = .Elsewhere
+				counts[c] -= 1
+			} else do res[i] = .Wrong
+		}
+	}
+	return res
+}
+
+make_guess :: proc(guess: Word) {
+	assert(game.try < GUESS_COUNT)
 }
 
 read_word_file :: proc(path: string) -> []Word {
@@ -77,8 +109,8 @@ entry :: proc() -> int {
 		defer rl.EndDrawing()
 		rl.ClearBackground(rl.DARKGRAY)
 
-		for i in 0 ..< 6 {
-			for j in 0 ..< 5 {
+		for i in 0 ..< GUESS_COUNT {
+			for j in 0 ..< WORD_LEN {
 				rect := rl.Rectangle {
 					x      = f32(j) * (BLOCK_SIZE + BLOCK_GAP),
 					y      = f32(i) * (BLOCK_SIZE + BLOCK_GAP),
@@ -86,6 +118,15 @@ entry :: proc() -> int {
 					height = BLOCK_SIZE,
 				}
 				rl.DrawRectangleRec(rect, rl.WHITE)
+				c := game.guesses[i][j]
+				if c == 0 do c = ' '
+				rl.DrawTextCodepoint(
+					rl.GetFontDefault(),
+					rune(c),
+					rl.Vector2{rect.x, rect.y},
+					30,
+					rl.BLACK,
+				)
 			}
 		}
 	}

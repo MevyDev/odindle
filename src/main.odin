@@ -1,6 +1,7 @@
 package main
 
 import "core:fmt"
+import "core:math"
 import "core:mem"
 import "core:os"
 
@@ -14,6 +15,27 @@ Solver :: struct {
 	possible_words:         []Word,
 	backing_feedback_table: []Feedback,
 	feedback_table:         [][]Feedback,
+}
+
+minmax :: proc(s: ^Solver, candidates: []Word) -> Word {
+	feedback_counts := make([]int, int(math.pow(3., WORD_LEN) + 10))
+	defer delete(feedback_counts)
+	best := s.guessable_words[0]
+	best_count := 999_999_999
+	for guess, i in s.guessable_words {
+		mx_count := 0
+		for answer, j in candidates {
+			feedback := s.feedback_table[i][j]
+			feedback_counts[feedback] += 1
+			mx_count = math.max(feedback_counts[feedback], mx_count)
+		}
+		if mx_count < best_count {
+			best = guess
+			best_count = mx_count
+		}
+		mem.zero_slice(feedback_counts)
+	}
+	return best
 }
 
 fill_feedback_table :: proc(s: ^Solver) {
@@ -115,6 +137,9 @@ entry :: proc() -> int {
 
 	solver := solver_init(wordles, nonwordles)
 	defer solver_deinit(&solver)
+
+	guess := minmax(&solver, solver.possible_words)
+	fmt.println(string(guess[:]))
 
 	return 0
 }

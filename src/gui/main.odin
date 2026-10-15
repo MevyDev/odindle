@@ -184,8 +184,8 @@ entry :: proc() -> int {
 				rl.DrawTextCodepoint(
 					rl.GetFontDefault(),
 					rune(c),
-					rl.Vector2{rect.x, rect.y},
-					BLOCK_SIZE,
+					rl.Vector2{rect.x + 20, rect.y},
+					BLOCK_SIZE - 10,
 					rl.BLACK,
 				)
 			}
@@ -240,8 +240,8 @@ newgame :: proc() -> (quit: bool) {
 		}
 	}
 	// fmt.println("done")
-	fmt.eprintfln("Word %s guessed in %d tries.", string(game.answer[:]), game.try)
-	fmt.eprintfln("Took %v.", time.tick_since(tick_start))
+	// fmt.eprintfln("Word %s guessed in %d tries.", string(game.answer[:]), game.try)
+	// fmt.eprintfln("Took %v.", time.tick_since(tick_start))
 	last_game = game
 	return false
 }

@@ -9,7 +9,7 @@ import "core:time"
 
 WORD_LEN :: 5
 
-Word :: [5]byte
+Word :: [WORD_LEN]byte
 Feedback :: u8
 
 Solver :: struct {
@@ -17,7 +17,9 @@ Solver :: struct {
 	possible_words:         []Word,
 	backing_feedback_table: []Feedback,
 	feedback_table:         [][]Feedback,
+	precomputed:            bool,
 	best_first:             Word,
+	best_second:            []Word,
 }
 
 Guess :: struct {
@@ -26,9 +28,8 @@ Guess :: struct {
 }
 
 State :: struct {
-	candidates:      []int,
-	guesses:         [dynamic]Guess,
-	use_precomputed: bool,
+	candidates: []int,
+	guesses:    [dynamic]Guess,
 }
 
 all_possible_feedbacks :: proc() -> []Feedback {
@@ -44,12 +45,12 @@ all_possible_feedbacks :: proc() -> []Feedback {
 }
 
 minmax :: proc(s: ^Solver, candidates: []int) -> Word {
-	feedback_counts := make([]int, int(math.pow(3., WORD_LEN) + 10))
+	feedback_counts := make([]i16, int(math.pow(3., WORD_LEN) + 10))
 	defer delete(feedback_counts)
 	best := [5]byte{'i', 'n', 'v', 'l', 'd'}
-	best_count := 999_999_999
+	best_count: i16 = 30_000
 	for guess, i in s.guessable_words {
-		mx_count := 0
+		mx_count: i16 = 0
 		for j in candidates {
 			feedback := s.feedback_table[i][j]
 			feedback_counts[feedback] += 1
@@ -118,7 +119,7 @@ fill_feedback_table :: proc(s: ^Solver) {
 	}
 }
 
-solver_init :: proc(wordles: []Word, nonwordles: []Word) -> Solver {
+solver_init :: proc(wordles: []Word, nonwordles: []Word, precompute: bool) -> Solver {
 	n := len(wordles) + len(nonwordles)
 	m := len(wordles)
 	res := Solver {
@@ -126,6 +127,7 @@ solver_init :: proc(wordles: []Word, nonwordles: []Word) -> Solver {
 		possible_words         = make([]Word, m),
 		backing_feedback_table = make([]Feedback, n * m),
 		feedback_table         = make([][]Feedback, n),
+		precomputed            = precompute,
 	}
 	for i in 0 ..< n {
 		res.feedback_table[i] = res.backing_feedback_table[i * m:(i + 1) * m]
@@ -137,8 +139,24 @@ solver_init :: proc(wordles: []Word, nonwordles: []Word) -> Solver {
 
 	fill_feedback_table(&res)
 
-	state := state_init(&res)
-	res.best_first = minmax(&res, state.candidates)
+	if precompute {
+		state := state_init(&res)
+		res.best_first = minmax(&res, state.candidates)
+		state_deinit(&state)
+
+		feedbacks := all_possible_feedbacks()
+		res.best_second = make([]Word, len(feedbacks))
+		for f in feedbacks {
+			state = state_init(&res)
+			guess := Guess {
+				word = res.best_first,
+				fb   = f,
+			}
+			state_update(&res, &state, guess)
+			res.best_second[f] = minmax(&res, state.candidates)
+			state_deinit(&state)
+		}
+	}
 
 	return res
 }
@@ -148,6 +166,7 @@ solver_deinit :: proc(s: ^Solver) {
 	delete(s.possible_words)
 	delete(s.feedback_table)
 	delete(s.backing_feedback_table)
+	if s.precomputed do delete(s.best_second)
 }
 
 feedback :: proc(guess: Word, answer: Word) -> Feedback {
@@ -198,7 +217,6 @@ state_init :: proc(s: ^Solver) -> State {
 	for &b, i in state.candidates {
 		b = i
 	}
-	state.use_precomputed = false
 	return state
 }
 
@@ -206,25 +224,26 @@ state_deinit :: proc(state: ^State) {
 	delete(state.candidates)
 }
 
-solve_word :: proc(s: ^Solver, answer: Word) -> (elapsed: time.Duration) {
+solve_word :: proc(s: ^Solver, answer: Word) -> (tries: int, elapsed: time.Duration) {
 	tick_start := time.tick_now()
 	state := state_init(s)
 	defer state_deinit(&state)
 
 	try := 0
+	fb: Feedback
 	for len(state.candidates) > 1 {
 		try += 1
 
 		guess_word: Word
-		if state.use_precomputed && try == 1 {
+		if s.precomputed && try == 1 {
 			guess_word = s.best_first
+		} else if s.precomputed && try == 2 {
+			guess_word = s.best_second[fb]
 		} else do guess_word = minmax(s, state.candidates)
 
-		fmt.println("Guessing word:", string(guess_word[:]))
-		fb := feedback(guess_word, answer)
+		fb = feedback(guess_word, answer)
 		guess := Guess{guess_word, fb}
 		state_update(s, &state, guess)
-		fmt.println("Candidates left:", len(state.candidates))
 	}
 	if len(state.candidates) == 0 {
 		fmt.eprintln("Impossible word. Exitting...")
@@ -232,11 +251,8 @@ solve_word :: proc(s: ^Solver, answer: Word) -> (elapsed: time.Duration) {
 	}
 	found := s.guessable_words[state.candidates[0]]
 	assert(found == answer)
-	fmt.println("Answer:", string(found[:]))
-	fmt.println("Guessed in tries:", try)
 	elapsed_tick := time.tick_since(tick_start)
-	fmt.println("Elapsed: ", elapsed_tick)
-	return elapsed_tick
+	return try, elapsed_tick
 }
 
 interactive_solve :: proc(s: ^Solver) {
@@ -298,14 +314,19 @@ read_word_file :: proc(path: string) -> []Word {
 	return res
 }
 
-benchmark :: proc(s: ^Solver, words: []Word) -> (elapsed: time.Duration) {
-	res: time.Duration
+benchmark :: proc(s: ^Solver, words: []Word) -> (avg: f32, elapsed: time.Duration) {
+	total_time: time.Duration
+	total_tries: int
 	for answer in words {
-		took := solve_word(s, answer)
-		res += took
+		tries, time_taken := solve_word(s, answer)
+		total_time += time_taken
+		total_tries += tries
 	}
-	fmt.println("All guesses took:", res)
-	return res
+	avg_tries := f32(total_tries) / f32(len(words))
+	fmt.println("All guesses took:", total_time)
+	fmt.println("Total tries: ", total_tries)
+	fmt.println("Average tries per word: ", avg_tries)
+	return avg_tries, total_time
 }
 
 entry :: proc() -> int {
@@ -314,11 +335,13 @@ entry :: proc() -> int {
 	nonwordles := read_word_file("nonwordles.txt")
 	defer delete(nonwordles)
 
-	solver := solver_init(wordles, nonwordles)
+	tick := time.tick_now()
+	solver := solver_init(wordles, nonwordles, false)
+	fmt.println("Initializing solver took:", time.tick_since(tick))
 	defer solver_deinit(&solver)
 
 	// interactive_solve(&solver)
-	benchmark(&solver, solver.possible_words[:100])
+	benchmark(&solver, solver.possible_words[:])
 
 	return 0
 }

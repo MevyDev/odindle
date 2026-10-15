@@ -10,6 +10,7 @@
 `<feedback>` - `<word length>` letters, c = correct, e = elsewhere, w = wrong
 `done` - word has been correctly guessed
 `quit` - tells the engine it's quitting
+`huh` - gui is confused by the word
 
 ### Engine
 

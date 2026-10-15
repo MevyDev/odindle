@@ -329,6 +329,7 @@ interact_gui_spec :: proc(s: ^Solver) {
 			if running {
 				state_deinit(&state)
 			}
+			running = false
 		} else if running {
 			fb, ok := feedback_from_string(line)
 			if !ok {

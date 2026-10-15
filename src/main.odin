@@ -16,6 +16,16 @@ Solver :: struct {
 	feedback_table:         [][]Feedback,
 }
 
+fill_feedback_table :: proc(s: ^Solver) {
+	n := len(s.guessable_words)
+	m := len(s.possible_words)
+	for i in 0 ..< n {
+		for j in 0 ..< m {
+			s.feedback_table[i][j] = feedback(s.guessable_words[i], s.possible_words[j])
+		}
+	}
+}
+
 feedback :: proc(guess: Word, answer: Word) -> Feedback {
 	counts: [26]u8
 	colors: [WORD_LEN]u8 // 0 gray 1 yellow 2 green

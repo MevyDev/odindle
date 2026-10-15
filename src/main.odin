@@ -279,7 +279,7 @@ solve_word :: proc(s: ^Solver, answer: Word) -> (tries: int, elapsed: time.Durat
 		if s.precomputed && state.try == 0 {
 			guess_word = s.best_first
 		} else if s.precomputed && state.try == 1 {
-			guess_word = s.best_second[fb]
+			guess_word = s.best_second[state.guesses[0].fb]
 		} else do guess_word = s.f(s, state.candidates)
 
 		fb = feedback(guess_word, answer)
@@ -306,7 +306,11 @@ interact_gui_spec :: proc(s: ^Solver) {
 	guess_word: Word
 	for true {
 		if running {
-			guess_word = s.f(s, state.candidates)
+			if s.precomputed && state.try == 0 {
+				guess_word = s.best_first
+			} else if s.precomputed && state.try == 1 {
+				guess_word = s.best_second[state.guesses[0].fb]
+			} else do guess_word = s.f(s, state.candidates)
 			fmt.println(string(guess_word[:]))
 		}
 

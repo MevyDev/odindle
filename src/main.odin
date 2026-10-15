@@ -32,6 +32,7 @@ Guess :: struct {
 State :: struct {
 	candidates: []int,
 	guesses:    [dynamic]Guess,
+	try:        int,
 }
 
 all_possible_feedbacks :: proc() -> []Feedback {
@@ -245,6 +246,7 @@ state_update :: proc(s: ^Solver, state: ^State, guess: Guess) {
 	delete(state.candidates)
 	state.candidates = new_candidates
 	append(&state.guesses, guess)
+	if guess.fb != CORRECT_FEEDBACK do state.try += 1
 }
 
 read_line :: proc(buf: []byte) -> (res: string, ok: bool) {
@@ -271,15 +273,12 @@ solve_word :: proc(s: ^Solver, answer: Word) -> (tries: int, elapsed: time.Durat
 	state := state_init(s)
 	defer state_deinit(&state)
 
-	try := 0
 	fb: Feedback
 	for len(state.candidates) > 1 {
-		try += 1
-
 		guess_word: Word
-		if s.precomputed && try == 1 {
+		if s.precomputed && state.try == 0 {
 			guess_word = s.best_first
-		} else if s.precomputed && try == 2 {
+		} else if s.precomputed && state.try == 1 {
 			guess_word = s.best_second[fb]
 		} else do guess_word = s.f(s, state.candidates)
 
@@ -287,7 +286,6 @@ solve_word :: proc(s: ^Solver, answer: Word) -> (tries: int, elapsed: time.Durat
 		guess := Guess{guess_word, fb}
 		state_update(s, &state, guess)
 	}
-	try += int(fb != CORRECT_FEEDBACK)
 
 	if len(state.candidates) == 0 {
 		fmt.eprintln("Impossible word. Exitting...")
@@ -298,7 +296,7 @@ solve_word :: proc(s: ^Solver, answer: Word) -> (tries: int, elapsed: time.Durat
 	assert(found == answer)
 
 	elapsed_tick := time.tick_since(tick_start)
-	return try, elapsed_tick
+	return state.try + 1, elapsed_tick
 }
 
 interact_gui_spec :: proc(s: ^Solver) {
@@ -338,7 +336,6 @@ interact_gui_spec :: proc(s: ^Solver) {
 			}
 			guess := Guess{guess_word, fb}
 			state_update(s, &state, guess)
-			fmt.eprintln(len(state.candidates))
 		}
 	}
 }
@@ -424,7 +421,7 @@ entry :: proc() -> int {
 	defer delete(nonwordles)
 
 	tick := time.tick_now()
-	solver := solver_init(wordles, nonwordles, true, entropy)
+	solver := solver_init(wordles, nonwordles, true, minmax)
 	fmt.eprintln("Initializing solver took:", time.tick_since(tick))
 	defer solver_deinit(&solver)
 

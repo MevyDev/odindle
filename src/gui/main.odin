@@ -24,6 +24,11 @@ Resp :: enum {
 
 word_set: map[Word]struct{}
 
+Game :: struct {
+	answer:      Word,
+	char_matrix: [GUESS_COUNT]Word,
+	feedbacks:   [GUESS_COUNT][WORD_LEN]Resp,
+}
 
 read_word_file :: proc(path: string) -> []Word {
 	ar: [dynamic]Word

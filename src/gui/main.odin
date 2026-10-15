@@ -80,7 +80,7 @@ make_guess :: proc(guess: Word) {
 	game.guesses[game.try] = guess
 
 	fb := feedback_give(guess)
-	game.feedbacks = fb
+	game.feedbacks[game.try] = fb
 
 	fb_str := string_from_feedback(fb)
 	fmt.println(string(fb_str[:]))
@@ -144,6 +144,8 @@ entry :: proc() -> int {
 	}
 
 	game.answer = random_word()
+	word, _ := word_from_string("hello")
+	make_guess(word)
 
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()
@@ -158,14 +160,22 @@ entry :: proc() -> int {
 					width  = BLOCK_SIZE,
 					height = BLOCK_SIZE,
 				}
-				rl.DrawRectangleRec(rect, rl.WHITE)
+
+				col: rl.Color
+				resp := game.feedbacks[i][j]
+				if resp == .None do col = rl.GRAY
+				if resp == .Wrong do col = rl.WHITE
+				if resp == .Elsewhere do col = rl.SKYBLUE
+				if resp == .Correct do col = rl.PINK
+				rl.DrawRectangleRec(rect, col)
+
 				c := game.guesses[i][j]
 				if c == 0 do c = ' '
 				rl.DrawTextCodepoint(
 					rl.GetFontDefault(),
 					rune(c),
 					rl.Vector2{rect.x, rect.y},
-					30,
+					BLOCK_SIZE,
 					rl.BLACK,
 				)
 			}

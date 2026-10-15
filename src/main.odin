@@ -46,6 +46,13 @@ solver_init :: proc(wordles: []Word, nonwordles: []Word) -> Solver {
 	return res
 }
 
+solver_deinit :: proc(s: ^Solver) {
+	delete(s.guessable_words)
+	delete(s.possible_words)
+	delete(s.feedback_table)
+	delete(s.backing_feedback_table)
+}
+
 feedback :: proc(guess: Word, answer: Word) -> Feedback {
 	counts: [26]u8
 	colors: [WORD_LEN]u8 // 0 gray 1 yellow 2 green
@@ -107,6 +114,9 @@ entry :: proc() -> int {
 	defer delete(wordles)
 	nonwordles := read_word_file("nonwordles.txt")
 	defer delete(nonwordles)
+
+	solver := solver_init(wordles, nonwordles)
+	defer solver_deinit(&solver)
 
 	return 0
 }

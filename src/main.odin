@@ -26,6 +26,28 @@ fill_feedback_table :: proc(s: ^Solver) {
 	}
 }
 
+solver_init :: proc(wordles: []Word, nonwordles: []Word) -> Solver {
+	n := len(wordles) + len(nonwordles)
+	m := len(wordles)
+	res := Solver {
+		guessable_words        = make([]Word, n),
+		possible_words         = make([]Word, m),
+		backing_feedback_table = make([]Feedback, n * m),
+		feedback_table         = make([][]Feedback, n),
+	}
+	for i in 0 ..< n {
+		res.feedback_table[i] = res.backing_feedback_table[i * m:(i + 1) * m]
+	}
+
+	copy(res.possible_words, wordles)
+	copy(res.guessable_words[0:m], wordles)
+	copy(res.guessable_words[m:], nonwordles)
+
+	fill_feedback_table(&res)
+
+	return res
+}
+
 feedback :: proc(guess: Word, answer: Word) -> Feedback {
 	counts: [26]u8
 	colors: [WORD_LEN]u8 // 0 gray 1 yellow 2 green

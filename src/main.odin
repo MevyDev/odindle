@@ -8,6 +8,7 @@ import "core:strings"
 import "core:time"
 
 WORD_LEN :: 5
+CORRECT_FEEDBACK: Feedback : 242
 
 Word :: [WORD_LEN]byte
 Feedback :: u8
@@ -245,12 +246,16 @@ solve_word :: proc(s: ^Solver, answer: Word) -> (tries: int, elapsed: time.Durat
 		guess := Guess{guess_word, fb}
 		state_update(s, &state, guess)
 	}
+	try += int(fb != CORRECT_FEEDBACK)
+
 	if len(state.candidates) == 0 {
 		fmt.eprintln("Impossible word. Exitting...")
 		return
 	}
+
 	found := s.guessable_words[state.candidates[0]]
 	assert(found == answer)
+
 	elapsed_tick := time.tick_since(tick_start)
 	return try, elapsed_tick
 }
@@ -336,7 +341,7 @@ entry :: proc() -> int {
 	defer delete(nonwordles)
 
 	tick := time.tick_now()
-	solver := solver_init(wordles, nonwordles, false)
+	solver := solver_init(wordles, nonwordles, true)
 	fmt.println("Initializing solver took:", time.tick_since(tick))
 	defer solver_deinit(&solver)
 

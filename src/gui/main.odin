@@ -15,6 +15,13 @@ WORD_LEN :: 5
 GUESS_COUNT :: 6
 Word :: [WORD_LEN]byte
 
+Resp :: enum {
+	None,
+	Wrong,
+	Elsewhere,
+	Correct,
+}
+
 read_word_file :: proc(path: string) -> []Word {
 	ar: [dynamic]Word
 	defer delete(ar)

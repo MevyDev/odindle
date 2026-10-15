@@ -101,7 +101,7 @@ feedback :: proc(guess: Word, answer: Word) -> Feedback {
 		if guess[i] == answer[i] {
 			colors[i] = 2
 		} else {
-			counts[guess[i] - 'a'] += 1
+			counts[answer[i] - 'a'] += 1
 		}
 	}
 

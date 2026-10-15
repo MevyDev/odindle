@@ -103,9 +103,7 @@ read_word_file :: proc(path: string) -> []Word {
 		}
 	}
 	res := make([]Word, len(ar))
-	for i in 0 ..< len(ar) {
-		res[i] = ar[i]
-	}
+	copy(res, ar[:])
 	return res
 }
 

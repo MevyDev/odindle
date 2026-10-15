@@ -10,6 +10,31 @@ WINDOW_TITLE :: "gayest wordle game"
 
 BLOCK_SIZE :: 80
 BLOCK_GAP :: 20
+read_word_file :: proc(path: string) -> []Word {
+	ar: [dynamic]Word
+	defer delete(ar)
+	contents, _ := os.read_entire_file(path, context.allocator)
+	defer delete(contents)
+	i := 0
+	j := 0
+	for b in contents {
+		if b == '\r' do continue
+		if b == '\n' {
+			if j != WORD_LEN do panic("Word file contains words of different length")
+			j = 0
+			i += 1
+		} else {
+			if j >= WORD_LEN do panic("Word file contains words of different length")
+			resize(&ar, i + 1)
+			ar[i][j] = b
+			j += 1
+		}
+	}
+	res := make([]Word, len(ar))
+	copy(res, ar[:])
+	return res
+}
+
 entry :: proc() -> int {
 	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE)
 

@@ -347,22 +347,14 @@ solve_word :: proc(s: ^Solver, answer: Word) -> (tries: int, elapsed: time.Durat
 	defer state_deinit(&state)
 
 	fb: Feedback
-	// TODO: refactor this into the solve functions themselves
 	for len(state.candidates) > 1 {
 		guess_word := get_word(s, &state)
 
 		fb = feedback(guess_word, answer)
+		if fb == CORRECT_FEEDBACK do break
 		guess := Guess{guess_word, fb}
 		state_update(s, &state, guess)
 	}
-
-	if len(state.candidates) == 0 {
-		fmt.eprintln("Impossible word. Exitting...")
-		return
-	}
-
-	found := s.guessable_words[state.candidates[0]]
-	assert(found == answer)
 
 	elapsed_tick := time.tick_since(tick_start)
 	return state.try + 1, elapsed_tick

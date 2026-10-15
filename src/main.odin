@@ -46,6 +46,32 @@ all_possible_feedbacks :: proc() -> []Feedback {
 	return res
 }
 
+entropy :: proc(s: ^Solver, candidates: []int) -> Word {
+	feedback_counts := make([]f64, int(math.pow(3., WORD_LEN) + 10))
+	defer delete(feedback_counts)
+	best := [5]byte{'i', 'n', 'v', 'l', 'd'}
+	score_best: f64 = -1.
+	for guess, i in s.guessable_words {
+		for j in candidates {
+			feedback := s.feedback_table[i][j]
+			feedback_counts[feedback] += 1
+		}
+		score: f64 = 0
+		for b in feedback_counts {
+			if b == 0 do continue
+			p := f64(b) / f64(len(candidates))
+			score -= p * math.log2(p)
+		}
+		if score > score_best {
+			best = guess
+			score_best = score
+		}
+		mem.zero_slice(feedback_counts)
+	}
+	assert(best != [5]byte{'i', 'n', 'v', 'l', 'd'})
+	return best
+}
+
 minmax :: proc(s: ^Solver, candidates: []int) -> Word {
 	feedback_counts := make([]i16, int(math.pow(3., WORD_LEN) + 10))
 	defer delete(feedback_counts)
@@ -352,8 +378,8 @@ entry :: proc() -> int {
 	fmt.println("Initializing solver took:", time.tick_since(tick))
 	defer solver_deinit(&solver)
 
-	// interactive_solve(&solver)
-	benchmark(&solver, solver.possible_words[:])
+	interactive_solve(&solver)
+	// benchmark(&solver, solver.possible_words[:])
 
 	return 0
 }

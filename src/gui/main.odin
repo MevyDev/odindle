@@ -1,7 +1,9 @@
 package wordle_gui
 
 import "core:c"
+import "core:crypto"
 import "core:fmt"
+import "core:math/rand"
 import "core:os"
 import "core:strings"
 import rl "vendor:raylib"
@@ -28,12 +30,15 @@ word_set: map[Word]struct{}
 
 Game :: struct {
 	answer:    Word,
-	try:       int,
+	try:       int, // 0-indexed
 	guesses:   [GUESS_COUNT]Word,
 	feedbacks: [GUESS_COUNT][WORD_LEN]Resp,
 }
 
 game := Game{}
+
+wordles: []Word
+nonwordles: []Word
 
 string_from_feedback :: proc(feedback: [WORD_LEN]Resp) -> [WORD_LEN]byte {
 	res: [WORD_LEN]byte
@@ -72,6 +77,15 @@ feedback_give :: proc(guess: Word) -> [WORD_LEN]Resp {
 
 make_guess :: proc(guess: Word) {
 	assert(game.try < GUESS_COUNT)
+	game.guesses[game.try] = guess
+
+	fb := feedback_give(guess)
+	game.feedbacks = fb
+
+	fb_str := string_from_feedback(fb)
+	fmt.println(string(fb_str[:]))
+
+	game.try += 1
 }
 
 read_word_file :: proc(path: string) -> []Word {
@@ -99,12 +113,17 @@ read_word_file :: proc(path: string) -> []Word {
 	return res
 }
 
+random_word :: proc() -> Word {
+	i := rand.int_max(len(wordles))
+	return wordles[i]
+}
+
 entry :: proc() -> int {
 	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE)
 
-	wordles := read_word_file("wordles.txt")
+	wordles = read_word_file("wordles.txt")
 	defer delete(wordles)
-	nonwordles := read_word_file("nonwordles.txt")
+	nonwordles = read_word_file("nonwordles.txt")
 	defer delete(nonwordles)
 
 	defer delete(word_set)
@@ -114,6 +133,8 @@ entry :: proc() -> int {
 	for word in nonwordles {
 		map_insert(&word_set, word, struct{}{})
 	}
+
+	game.answer = random_word()
 
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()

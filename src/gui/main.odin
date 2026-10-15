@@ -212,6 +212,7 @@ newgame :: proc() -> (quit: bool) {
 			fmt.println("huh")
 			continue
 		}
+		fmt.eprintln(">", string(word[:]))
 
 		if word not_in word_set {
 			fmt.println("huh")

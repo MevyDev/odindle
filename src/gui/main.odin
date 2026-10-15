@@ -10,6 +10,11 @@ WINDOW_TITLE :: "gayest wordle game"
 
 BLOCK_SIZE :: 80
 BLOCK_GAP :: 20
+
+WORD_LEN :: 5
+GUESS_COUNT :: 6
+Word :: [WORD_LEN]byte
+
 read_word_file :: proc(path: string) -> []Word {
 	ar: [dynamic]Word
 	defer delete(ar)
@@ -37,6 +42,11 @@ read_word_file :: proc(path: string) -> []Word {
 
 entry :: proc() -> int {
 	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE)
+
+	wordles := read_word_file("wordles.txt")
+	defer delete(wordles)
+	nonwordles := read_word_file("nonwordles.txt")
+	defer delete(nonwordles)
 
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()

@@ -259,7 +259,7 @@ main :: proc() {
 		}
 	}
 
-	fmt.println(":3")
+	fmt.eprintln(":3")
 
 	exit_code = entry()
 }

@@ -12,7 +12,7 @@ import "core:time"
 import rl "vendor:raylib"
 
 WINDOW_WIDTH :: 720
-WINDOW_HEIGHT :: 720
+WINDOW_HEIGHT :: 900
 WINDOW_TITLE :: "gayest wordle game"
 
 SAMPLE_COUNT :: 500
@@ -211,9 +211,9 @@ entry :: proc() -> int {
 		defer delete(info)
 		cinfo := strings.clone_to_cstring(info)
 		defer delete(cinfo)
-		info_len := rl.MeasureText(cinfo, 20)
+		info_len := rl.MeasureText(cinfo, 40)
 		info_x := (WINDOW_WIDTH - info_len) / 2
-		rl.DrawText(cinfo, info_x, 0, 20, rl.WHITE)
+		rl.DrawText(cinfo, info_x, 0, 40, rl.WHITE)
 
 		grid_width: f32 = (BLOCK_SIZE + BLOCK_GAP) * WORD_LEN - BLOCK_GAP
 		grid_height: f32 = (BLOCK_SIZE + BLOCK_GAP) * GUESS_COUNT - BLOCK_GAP

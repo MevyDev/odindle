@@ -4,6 +4,8 @@ import "core:fmt"
 import "core:math"
 import "core:mem"
 import "core:os"
+import "core:strings"
+import "core:time"
 
 WORD_LEN :: 5
 
@@ -15,16 +17,40 @@ Solver :: struct {
 	possible_words:         []Word,
 	backing_feedback_table: []Feedback,
 	feedback_table:         [][]Feedback,
+	best_first:             Word,
 }
 
-minmax :: proc(s: ^Solver, candidates: []Word) -> Word {
+Guess :: struct {
+	word: Word,
+	fb:   Feedback,
+}
+
+State :: struct {
+	candidates:      []int,
+	guesses:         [dynamic]Guess,
+	use_precomputed: bool,
+}
+
+all_possible_feedbacks :: proc() -> []Feedback {
+	n := 1
+	for _ in 0 ..< WORD_LEN {
+		n *= 3
+	}
+	res := make([]Feedback, n)
+	for i in 0 ..< n {
+		res[i] = Feedback(i)
+	}
+	return res
+}
+
+minmax :: proc(s: ^Solver, candidates: []int) -> Word {
 	feedback_counts := make([]int, int(math.pow(3., WORD_LEN) + 10))
 	defer delete(feedback_counts)
-	best := s.guessable_words[0]
+	best := [5]byte{'i', 'n', 'v', 'l', 'd'}
 	best_count := 999_999_999
 	for guess, i in s.guessable_words {
 		mx_count := 0
-		for answer, j in candidates {
+		for j in candidates {
 			feedback := s.feedback_table[i][j]
 			feedback_counts[feedback] += 1
 			mx_count = math.max(feedback_counts[feedback], mx_count)
@@ -36,6 +62,15 @@ minmax :: proc(s: ^Solver, candidates: []Word) -> Word {
 		mem.zero_slice(feedback_counts)
 	}
 	return best
+}
+
+word_from_string :: proc(s: string) -> (res: Word, ok: bool) {
+	if len(s) != WORD_LEN do return Word{}, false
+	r: Word
+	for i in 0 ..< WORD_LEN {
+		r[i] = s[i]
+	}
+	return r, true
 }
 
 feedback_from_string :: proc(s: string) -> (res: Feedback, ok: bool) {
@@ -57,22 +92,17 @@ feedback_from_string :: proc(s: string) -> (res: Feedback, ok: bool) {
 	return r, true
 }
 
-candidates_update :: proc(
-	s: ^Solver,
-	candidates_old: []Word,
-	guessed_word: Word,
-	fb: Feedback,
-) -> []Word {
+candidates_update :: proc(s: ^Solver, candidates_old: []int, guess: Guess) -> []int {
 	n := 0
 	for cand in candidates_old {
-		if feedback(guessed_word, cand) == fb {
+		if feedback(guess.word, s.guessable_words[cand]) == guess.fb {
 			n += 1
 		}
 	}
-	res := make([]Word, n)
+	res := make([]int, n)
 	i := 0
 	for cand in candidates_old {
-		if feedback(guessed_word, cand) == fb {
+		if feedback(guess.word, s.guessable_words[cand]) == guess.fb {
 			res[i] = cand
 			i += 1
 		}
@@ -106,6 +136,9 @@ solver_init :: proc(wordles: []Word, nonwordles: []Word) -> Solver {
 	copy(res.guessable_words[m:], nonwordles)
 
 	fill_feedback_table(&res)
+
+	state := state_init(&res)
+	res.best_first = minmax(&res, state.candidates)
 
 	return res
 }
@@ -146,6 +179,100 @@ feedback :: proc(guess: Word, answer: Word) -> Feedback {
 	return res
 }
 
+state_update :: proc(s: ^Solver, state: ^State, guess: Guess) {
+	new_candidates := candidates_update(s, state.candidates, guess)
+	delete(state.candidates)
+	state.candidates = new_candidates
+	append(&state.guesses, guess)
+}
+
+read_line :: proc(buf: []byte) -> (res: string, ok: bool) {
+	n, err := os.read(os.stdin, buf)
+	if err != nil || n == 0 do return "", false
+	return strings.trim(string(buf[:n]), "\r\n"), true
+}
+
+state_init :: proc(s: ^Solver) -> State {
+	state: State
+	state.candidates = make([]int, len(s.possible_words))
+	for &b, i in state.candidates {
+		b = i
+	}
+	state.use_precomputed = false
+	return state
+}
+
+state_deinit :: proc(state: ^State) {
+	delete(state.candidates)
+}
+
+solve_word :: proc(s: ^Solver, answer: Word) -> (elapsed: time.Duration) {
+	tick_start := time.tick_now()
+	state := state_init(s)
+	defer state_deinit(&state)
+
+	try := 0
+	for len(state.candidates) > 1 {
+		try += 1
+
+		guess_word: Word
+		if state.use_precomputed && try == 1 {
+			guess_word = s.best_first
+		} else do guess_word = minmax(s, state.candidates)
+
+		fmt.println("Guessing word:", string(guess_word[:]))
+		fb := feedback(guess_word, answer)
+		guess := Guess{guess_word, fb}
+		state_update(s, &state, guess)
+		fmt.println("Candidates left:", len(state.candidates))
+	}
+	if len(state.candidates) == 0 {
+		fmt.eprintln("Impossible word. Exitting...")
+		return
+	}
+	found := s.guessable_words[state.candidates[0]]
+	assert(found == answer)
+	fmt.println("Answer:", string(found[:]))
+	fmt.println("Guessed in tries:", try)
+	elapsed_tick := time.tick_since(tick_start)
+	fmt.println("Elapsed: ", elapsed_tick)
+	return elapsed_tick
+}
+
+interactive_solve :: proc(s: ^Solver) {
+	state := state_init(s)
+	defer state_deinit(&state)
+
+	read_buf: [256]byte
+
+	for len(state.candidates) > 1 {
+		guess_word := minmax(s, state.candidates)
+		fmt.println(string(guess_word[:]))
+		fb: Feedback; ok: bool
+		for !ok {
+			fb_str, read_ok := read_line(read_buf[:])
+			if !read_ok {
+				fmt.eprintln("Read error")
+				continue
+			}
+			fb, ok = feedback_from_string(fb_str)
+			if ok do break
+			fmt.eprintln("Bad feedback string")
+			fmt.eprintln("'w' for wrong")
+			fmt.eprintln("'e' for elsewhere")
+			fmt.eprintln("'c' for correct")
+		}
+		guess := Guess{guess_word, fb}
+		state_update(s, &state, guess)
+	}
+	if len(state.candidates) == 0 {
+		fmt.eprintln("Impossible word, exitting")
+		return
+	}
+	res := string(s.guessable_words[state.candidates[0]][:])
+	fmt.println(res, "done")
+}
+
 read_word_file :: proc(path: string) -> []Word {
 	ar: [dynamic]Word
 	defer delete(ar)
@@ -171,6 +298,16 @@ read_word_file :: proc(path: string) -> []Word {
 	return res
 }
 
+benchmark :: proc(s: ^Solver, words: []Word) -> (elapsed: time.Duration) {
+	res: time.Duration
+	for answer in words {
+		took := solve_word(s, answer)
+		res += took
+	}
+	fmt.println("All guesses took:", res)
+	return res
+}
+
 entry :: proc() -> int {
 	wordles := read_word_file("wordles.txt")
 	defer delete(wordles)
@@ -180,17 +317,8 @@ entry :: proc() -> int {
 	solver := solver_init(wordles, nonwordles)
 	defer solver_deinit(&solver)
 
-	guess := minmax(&solver, solver.possible_words)
-	fmt.println(string(guess[:]))
-
-	fb, _ := feedback_from_string("ewwwe")
-	new_cands := candidates_update(&solver, solver.possible_words, guess, fb)
-	for &cand in new_cands {
-		fmt.println(string(cand[:]))
-	}
-	defer delete(new_cands)
-	guess2 := minmax(&solver, new_cands)
-	fmt.println(string(guess2[:]))
+	// interactive_solve(&solver)
+	benchmark(&solver, solver.possible_words[:100])
 
 	return 0
 }

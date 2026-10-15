@@ -14,6 +14,7 @@ Word :: [WORD_LEN]byte
 Feedback :: u8
 
 Solver :: struct {
+	f:                      proc(_: ^Solver, _: []int) -> Word,
 	guessable_words:        []Word,
 	possible_words:         []Word,
 	backing_feedback_table: []Feedback,
@@ -120,10 +121,16 @@ fill_feedback_table :: proc(s: ^Solver) {
 	}
 }
 
-solver_init :: proc(wordles: []Word, nonwordles: []Word, precompute: bool) -> Solver {
+solver_init :: proc(
+	wordles: []Word,
+	nonwordles: []Word,
+	precompute: bool,
+	f: proc(_: ^Solver, _: []int) -> Word,
+) -> Solver {
 	n := len(wordles) + len(nonwordles)
 	m := len(wordles)
 	res := Solver {
+		f                      = f,
 		guessable_words        = make([]Word, n),
 		possible_words         = make([]Word, m),
 		backing_feedback_table = make([]Feedback, n * m),
@@ -142,7 +149,7 @@ solver_init :: proc(wordles: []Word, nonwordles: []Word, precompute: bool) -> So
 
 	if precompute {
 		state := state_init(&res)
-		res.best_first = minmax(&res, state.candidates)
+		res.best_first = res.f(&res, state.candidates)
 		state_deinit(&state)
 
 		feedbacks := all_possible_feedbacks()
@@ -154,7 +161,7 @@ solver_init :: proc(wordles: []Word, nonwordles: []Word, precompute: bool) -> So
 				fb   = f,
 			}
 			state_update(&res, &state, guess)
-			res.best_second[f] = minmax(&res, state.candidates)
+			res.best_second[f] = res.f(&res, state.candidates)
 			state_deinit(&state)
 		}
 	}
@@ -240,7 +247,7 @@ solve_word :: proc(s: ^Solver, answer: Word) -> (tries: int, elapsed: time.Durat
 			guess_word = s.best_first
 		} else if s.precomputed && try == 2 {
 			guess_word = s.best_second[fb]
-		} else do guess_word = minmax(s, state.candidates)
+		} else do guess_word = s.f(s, state.candidates)
 
 		fb = feedback(guess_word, answer)
 		guess := Guess{guess_word, fb}
@@ -267,7 +274,7 @@ interactive_solve :: proc(s: ^Solver) {
 	read_buf: [256]byte
 
 	for len(state.candidates) > 1 {
-		guess_word := minmax(s, state.candidates)
+		guess_word := s.f(s, state.candidates)
 		fmt.println(string(guess_word[:]))
 		fb: Feedback; ok: bool
 		for !ok {
@@ -341,7 +348,7 @@ entry :: proc() -> int {
 	defer delete(nonwordles)
 
 	tick := time.tick_now()
-	solver := solver_init(wordles, nonwordles, true)
+	solver := solver_init(wordles, nonwordles, true, minmax)
 	fmt.println("Initializing solver took:", time.tick_since(tick))
 	defer solver_deinit(&solver)
 

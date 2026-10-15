@@ -52,9 +52,11 @@ entropy :: proc(s: ^Solver, candidates: []int) -> Word {
 	best := [5]byte{'i', 'n', 'v', 'l', 'd'}
 	score_best: f64 = -1.
 	for guess, i in s.guessable_words {
+		in_candidates: bool
 		for j in candidates {
 			feedback := s.feedback_table[i][j]
 			feedback_counts[feedback] += 1
+			in_candidates |= i == j
 		}
 		score: f64 = 0
 		for b in feedback_counts {
@@ -65,6 +67,8 @@ entropy :: proc(s: ^Solver, candidates: []int) -> Word {
 		if score > score_best {
 			best = guess
 			score_best = score
+		} else if score == score_best && in_candidates {
+			best = guess
 		}
 		mem.zero_slice(feedback_counts)
 	}
@@ -78,15 +82,19 @@ minmax :: proc(s: ^Solver, candidates: []int) -> Word {
 	best := [5]byte{'i', 'n', 'v', 'l', 'd'}
 	best_count: i16 = 30_000
 	for guess, i in s.guessable_words {
+		in_candidates: bool
 		mx_count: i16 = 0
 		for j in candidates {
 			feedback := s.feedback_table[i][j]
 			feedback_counts[feedback] += 1
 			mx_count = math.max(feedback_counts[feedback], mx_count)
+			in_candidates |= i == j
 		}
 		if mx_count < best_count {
 			best = guess
 			best_count = mx_count
+		} else if mx_count == best_count && in_candidates {
+			best = guess
 		}
 		mem.zero_slice(feedback_counts)
 	}
@@ -374,8 +382,8 @@ entry :: proc() -> int {
 	defer delete(nonwordles)
 
 	tick := time.tick_now()
-	solver := solver_init(wordles, nonwordles, true, minmax)
-	fmt.println("Initializing solver took:", time.tick_since(tick))
+	solver := solver_init(wordles, nonwordles, true, entropy)
+	fmt.eprintln("Initializing solver took:", time.tick_since(tick))
 	defer solver_deinit(&solver)
 
 	interactive_solve(&solver)

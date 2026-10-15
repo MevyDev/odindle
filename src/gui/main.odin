@@ -2,6 +2,7 @@ package wordle_gui
 
 import "core:fmt"
 import "core:os"
+import "core:strings"
 import rl "vendor:raylib"
 
 WINDOW_WIDTH :: 720

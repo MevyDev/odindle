@@ -228,20 +228,22 @@ solver_init :: proc(
 
 		res.best_third = make([]Word, len(feedbacks) * len(feedbacks))
 		for f1 in feedbacks {
+			state1 := state_init(&res)
+			defer state_deinit(&state1)
+			guess1 := Guess {
+				word = res.best_first,
+				fb   = f1,
+			}
+			state_update(&res, &state1, guess1)
 			for f2 in feedbacks {
-				state = state_init(&res)
-				guess1 := Guess {
-					word = res.best_first,
-					fb   = f1,
-				}
-				state_update(&res, &state, guess1)
+				state2 := state_init_clone(&state1)
+				defer state_deinit(&state2)
 				guess2 := Guess {
 					word = res.best_second[f1],
 					fb   = f2,
 				}
-				state_update(&res, &state, guess2)
-				res.best_third[int(f2) * len(feedbacks) + int(f1)] = res.f(&res, state.candidates)
-				state_deinit(&state)
+				state_update(&res, &state2, guess2)
+				res.best_third[int(f2) * len(feedbacks) + int(f1)] = res.f(&res, state2.candidates)
 			}
 		}
 		fmt.eprintln("Precomputing", time.tick_since(tick))
@@ -307,6 +309,17 @@ state_init :: proc(s: ^Solver) -> State {
 		state.cand_buf[i] = i
 	}
 	state.candidates = state.cand_buf[:]
+	return state
+}
+
+state_init_clone :: proc(state_old: ^State) -> State {
+	state: State
+	state.cand_buf = make([]int, len(state_old.candidates))
+	copy(state.cand_buf, state_old.candidates)
+	state.candidates = state.cand_buf[:]
+	for guess in state_old.guesses {
+		append(&state.guesses, guess)
+	}
 	return state
 }
 

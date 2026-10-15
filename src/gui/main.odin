@@ -75,17 +75,16 @@ feedback_give :: proc(guess: Word) -> [WORD_LEN]Resp {
 	return res
 }
 
-make_guess :: proc(guess: Word) {
+make_guess :: proc(guess: Word) -> [WORD_LEN]Resp {
 	assert(game.try < GUESS_COUNT)
 	game.guesses[game.try] = guess
 
 	fb := feedback_give(guess)
 	game.feedbacks[game.try] = fb
 
-	fb_str := string_from_feedback(fb)
-	fmt.println(string(fb_str[:]))
-
 	game.try += 1
+
+	return fb
 }
 
 read_word_file :: proc(path: string) -> []Word {
@@ -147,6 +146,8 @@ entry :: proc() -> int {
 	word, _ := word_from_string("hello")
 	make_guess(word)
 
+	for !newgame() {}
+
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()
 		defer rl.EndDrawing()
@@ -182,7 +183,45 @@ entry :: proc() -> int {
 		}
 	}
 
+	fmt.println("quit")
+
 	return 0
+}
+read_line :: proc(buf: []byte) -> (res: string, ok: bool) {
+	n, err := os.read(os.stdin, buf)
+	if err != nil || n == 0 do return "", false
+	return strings.trim(string(buf[:n]), "\r\n"), true
+}
+
+newgame :: proc() -> (quit: bool) {
+	fmt.printfln("newgame %d %d", WORD_LEN, GUESS_COUNT)
+	game = Game{}
+	game.answer = random_word()
+
+	buf: [256]byte
+	for true {
+		line, ok := read_line(buf[:])
+		if !ok do continue
+		if line == "quit" do return true
+
+		word, okword := word_from_string(line)
+		if !okword do continue
+
+		if word not_in word_set do continue
+
+		fb := make_guess(word)
+		if word == game.answer {
+			break
+		} else {
+			fb_str := string_from_feedback(fb)
+			fmt.println(string(fb_str[:]))
+		}
+		if game.try >= GUESS_COUNT {
+			break
+		}
+	}
+	fmt.println("done")
+	return false
 }
 
 main :: proc() {

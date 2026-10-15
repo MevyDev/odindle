@@ -14,6 +14,5 @@
 
 ### Engine
 
-`ok` - responds to gui that a new game can start
 `<guess>` - word the engine guesses
 `quit` - tells the gui the engine is stopping

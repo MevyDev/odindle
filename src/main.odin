@@ -325,7 +325,6 @@ interact_gui_spec :: proc(s: ^Solver) {
 			if running do state_deinit(&state)
 			running = true
 			state = state_init(s)
-			fmt.println("ok")
 		} else if line == "done" {
 			if running {
 				state_deinit(&state)

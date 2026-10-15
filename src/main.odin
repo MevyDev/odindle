@@ -122,6 +122,9 @@ entry :: proc() -> int {
 }
 
 main :: proc() {
+	exit_code := 0
+	defer os.exit(exit_code)
+
 	when ODIN_DEBUG {
 		track: mem.Tracking_Allocator
 		mem.tracking_allocator_init(&track, context.allocator)
@@ -146,5 +149,5 @@ main :: proc() {
 
 	fmt.println(":3")
 
-	os.exit(entry())
+	exit_code = entry()
 }
